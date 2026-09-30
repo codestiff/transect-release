@@ -1,0 +1,27 @@
+# THIS REPOSITORY HOLDS THE BUILT GAME ONLY -- never its source.
+# Everything is ignored; only the web build's own file types are let through.
+# (tools/release.sh in the source repository also refuses any other file
+# before it pushes: a `git add -f` walks past this list.)
+*
+!*/
+!.gitignore
+!.nojekyll
+!README.md
+!index.html
+!*.wasm
+!*.pck
+!*.js
+!*.png
+!*.ico
+!*.svg
+!*.webmanifest
+!version.json
+# Never, even inside a let-through folder:
+*.gd
+*.gdc
+*.remap
+*.tscn
+*.tres
+*.cfg
+*.md
+!README.md

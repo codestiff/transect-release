@@ -111,6 +111,8 @@
   }
   #crash button.quiet { background: var(--line); color: var(--ink); }
   @media (prefers-reduced-motion: reduce) { .rule i { transition: none; } }
+  /* A build for players: the developer's lines hidden (docs/plans/025). */
+  .public .dev { display: none; }
 </style>
 
 <canvas id="canvas" tabindex="0" aria-label="The valley"></canvas>
@@ -118,15 +120,15 @@
 
 <div id="boot">
   <h1>transect</h1>
-  <p class="gloss">A walk up a valley that does not end, grown from the asset library as you arrive.</p>
+  <p class="gloss">A walk up a Highland valley, and a night out in it, grown on your device as you arrive.</p>
   <div class="rule" aria-hidden="true"><i id="bar"></i></div>
   <div id="stat">checking this browser</div>
   <dl class="how">
     <dt>phone</dt><dd>left thumb walks, right thumb looks, pinch to zoom, RUN toggles pace</dd>
     <dt>keys</dt><dd>WASD or arrows to walk, drag to look, Shift to run, wheel or +/- to zoom</dd>
     <dt>sound</dt><dd>starts with your first touch or key; the speaker button sets sound and music, M mutes</dd>
-    <dt>storm</dt><dd>sun button, Weather, then the Storm slider</dd>
-    <dt>help</dt><dd>sun button, More, Diagnostics: copy it and send it</dd>
+    <dt class="dev">storm</dt><dd class="dev">sun button, Weather, then the Storm slider</dd>
+    <dt class="dev">help</dt><dd class="dev">sun button, Measure, Diagnostics: copy it and send it</dd>
   </dl>
   <div id="diag" hidden></div>
 </div>
@@ -153,6 +155,14 @@
   </div>
 </div>
 
+<script>
+// THE BUILD'S MODE (tools/pack-web.py, docs/plans/025): a build for players
+// shows none of the developer's lines, and takes no scene from its address;
+// `?dev` gives them back, as it gives the game its tools.
+var MODE = "public";
+var DEV = MODE === "dev" || /[?&]dev(=|&|$)/.test(location.search);
+if (!DEV) document.documentElement.classList.add("public");
+</script>
 <script>
 // DIAGNOSTICS AND AUDIO, installed before the engine loads, so they see
 // everything it does.
@@ -616,7 +626,7 @@
     // SCENES BY URL: ?storm=1&hour=23 and the like become the game's own
     // review arguments (src/main.gd), so a link can open a given scene.
     var args = [];
-    try {
+    if (DEV) try {
       var q = new URLSearchParams(location.search);
       ["hour", "day", "clouds", "mist", "rain", "storm", "strike", "heading", "pitch", "zoom", "north", "east", "quality", "bench", "power", "aurora", "shelter", "torch", "beds", "wind"].forEach(function (k) {
         if (q.has(k)) args.push("--" + k + "=" + q.get(k));

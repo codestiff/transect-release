@@ -113,22 +113,34 @@
   @media (prefers-reduced-motion: reduce) { .rule i { transition: none; } }
   /* A build for players: the developer's lines hidden (docs/plans/025). */
   .public .dev { display: none; }
+  #busy {
+    position: fixed; left: 50%; bottom: 28px; width: 22px; height: 22px; margin-left: -11px;
+    border-radius: 50%; border: 2px solid rgba(220, 228, 224, 0.18); border-top-color: rgba(220, 228, 224, 0.85);
+    animation: busy-turn 0.9s linear infinite; pointer-events: none; z-index: 20; will-change: transform;
+  }
+  #busy.gone { display: none; }
+  @keyframes busy-turn { to { transform: rotate(360deg); } }
 </style>
 
 <canvas id="canvas" tabindex="0" aria-label="The valley"></canvas>
 <div id="stamp"></div>
+<!-- THE PAGE'S SPINNER (docs/plans/026): turns from the first byte until the
+     game says its valley is ready. Drawn by the browser's compositor (a CSS
+     transform), so it keeps turning while the game's one thread is busy
+     growing a plant -- when nothing the game draws can move. -->
+<div id="busy" aria-hidden="true"></div>
 
 <div id="boot">
   <h1>transect</h1>
-  <p class="gloss">A walk up a Highland valley, and a night out in it, grown on your device as you arrive.</p>
+  <p class="gloss">Into the wilderness: a night out in a Highland valley, grown on your device as you arrive.</p>
   <div class="rule" aria-hidden="true"><i id="bar"></i></div>
   <div id="stat">checking this browser</div>
   <dl class="how">
     <dt>phone</dt><dd>left thumb walks, right thumb looks, pinch to zoom, RUN toggles pace</dd>
     <dt>keys</dt><dd>WASD or arrows to walk, drag to look, Shift to run, wheel or +/- to zoom</dd>
     <dt>sound</dt><dd>starts with your first touch or key; the speaker button sets sound and music, M mutes</dd>
-    <dt class="dev">storm</dt><dd class="dev">sun button, Weather, then the Storm slider</dd>
-    <dt class="dev">help</dt><dd class="dev">sun button, Measure, Diagnostics: copy it and send it</dd>
+    <dt class="dev">storm</dt><dd class="dev">gear button, Weather, then the Storm slider</dd>
+    <dt class="dev">help</dt><dd class="dev">gear button, Measure, Diagnostics: copy it and send it</dd>
   </dl>
   <div id="diag" hidden></div>
 </div>
@@ -156,12 +168,52 @@
 </div>
 
 <script>
+// THE THREADED RUNTIME NEEDS AN ISOLATED PAGE (docs/plans/055): when this
+// build ships one, page/coi.js -- a service worker adding the two
+// cross-origin isolation headers a static host cannot send -- is registered
+// and the page reloads once under it. A browser that will not run it keeps
+// the page un-isolated, and the single-threaded runtime loads instead.
+(function () {
+  var mt = ["godot-mt.0.wasm", "godot-mt.1.wasm", "godot-mt.2.wasm", "godot-mt.3.wasm"];
+  window.__trIsolated = self.crossOriginIsolated === true;
+  if (!mt || window.__trIsolated || !("serviceWorker" in navigator)) return;
+  try { if (sessionStorage.getItem("tr-coi")) return; sessionStorage.setItem("tr-coi", "1"); } catch (e) { return; }
+  window.__trIsolating = true;
+  navigator.serviceWorker.register("coi.js").then(function (reg) {
+    var go = function () { location.reload(); };
+    if (navigator.serviceWorker.controller) { go(); return; }
+    navigator.serviceWorker.addEventListener("controllerchange", go);
+    if (reg.active) go();
+  }).catch(function () { window.__trIsolating = false; });
+})();
+</script>
+<script>
 // THE BUILD'S MODE (tools/pack-web.py, docs/plans/025): a build for players
 // shows none of the developer's lines, and takes no scene from its address;
 // `?dev` gives them back, as it gives the game its tools.
 var MODE = "public";
+// The game puts the spinner away when its valley is ready (src/main.gd).
+window.__trLoaded = function () { var b = document.getElementById("busy"); if (b) b.className = "gone"; };
 var DEV = MODE === "dev" || /[?&]dev(=|&|$)/.test(location.search);
 if (!DEV) document.documentElement.classList.add("public");
+// THE OWNER'S SWITCH (docs/plans/030): `trDev()` in this console turns the
+// game's developer tools on, `trDev()` again off (or `trDev(true|false)`),
+// in the running game -- no reload. Said nowhere on the page.
+window.trDev = function (on) {
+  if (!window.__tr_dev) return "transect: the game is still starting; try again in a moment";
+  window.__tr_dev(on === undefined ? -1 : (on ? 1 : 0));
+  return window.__trOut;
+};
+// THE BATTERY, where the browser tells (docs/plans/067; Chrome on Android:
+// navigator.getBattery; Safari tells nothing): kept for the game's load meter.
+if (navigator.getBattery) {
+  navigator.getBattery().then(function (b) {
+    var keep = function () { window.__trBattery = { level: b.level, charging: b.charging }; };
+    keep();
+    b.addEventListener("levelchange", keep);
+    b.addEventListener("chargingchange", keep);
+  }).catch(function () {});
+}
 </script>
 <script>
 // DIAGNOSTICS AND AUDIO, installed before the engine loads, so they see
@@ -551,16 +603,24 @@ if (!DEV) document.documentElement.classList.add("public");
 <script>
 (function () {
   "use strict";
-  var PARTS = ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
-  var WASM_BYTES = 38057390;
-  var PCK = "transect-51d2ac6ac999.pck";
-  var PCK_BYTES = 10496160;
-  var BUILD = "transect 0.1.0 919c083fc2  |  lib e49942d";
+  // ONE RUNTIME OF TWO (docs/plans/055): the threaded one when the page is
+  // isolated and the build ships it, else the single-threaded one.
+  var PARTS_MT = ["godot-mt.0.wasm", "godot-mt.1.wasm", "godot-mt.2.wasm", "godot-mt.3.wasm"];
+  var MT = !!PARTS_MT && self.crossOriginIsolated === true;
+  var EXE = MT ? "godot-mt" : "godot";
+  var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
+  var WASM_BYTES = MT ? 37342091 : 38057390;
+  window.__trRuntime = MT ? "threaded" : "single-threaded";
+  var PCK = "transect-93f0a5ce2333.pck";
+  var PCK_BYTES = 11067060;
+  var BUILD = "transect 0.1.0 578321cb93  |  lib b84a738";
+  // The game keys the plants it keeps on the device by this (TrRungStore).
+  window.__trBuild = BUILD;
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
   var diag = document.getElementById("diag");
-  document.getElementById("stamp").textContent = BUILD;
+  document.getElementById("stamp").textContent = BUILD + (MT ? "  |  threads" : "");
 
   function setBar(f) { bar.style.width = (Math.max(0, Math.min(1, f)) * 100).toFixed(1) + "%"; }
   function mb(b) { return (b / 1048576).toFixed(1) + " MB"; }
@@ -610,7 +670,7 @@ if (!DEV) document.documentElement.classList.add("public");
   var realFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = (typeof input === "string") ? input : (input && input.url) || "";
-    if (/godot\.wasm(\?|$)/.test(url)) {
+    if (/godot(-mt)?\.wasm(\?|$)/.test(url)) {
       return getWasm().then(function (b) {
         return new Response(b.slice().buffer, { status: 200, headers: { "Content-Type": "application/wasm" } });
       });
@@ -638,14 +698,14 @@ if (!DEV) document.documentElement.classList.add("public");
       canvas: document.getElementById("canvas"),
       canvasResizePolicy: 2,
       ensureCrossOriginIsolationHeaders: false,
-      executable: "godot",
+      executable: EXE,
       experimentalVK: false,
-      fileSizes: (function () { var o = {}; o[PCK] = PCK_BYTES; o["godot.wasm"] = WASM_BYTES; return o; })(),
+      fileSizes: (function () { var o = {}; o[PCK] = PCK_BYTES; o[EXE + ".wasm"] = WASM_BYTES; return o; })(),
       focusCanvas: true,
       gdextensionLibs: [],
       mainPack: PCK
     });
-    var missing = Engine.getMissingFeatures ? Engine.getMissingFeatures({ threads: false }) : [];
+    var missing = Engine.getMissingFeatures ? Engine.getMissingFeatures({ threads: MT }) : [];
     if (missing.length) { fail("This browser is missing features the engine needs.", missing.join("\n")); return; }
     stat.textContent = "engine  starting";
     engine.startGame({
@@ -665,5 +725,16 @@ if (!DEV) document.documentElement.classList.add("public");
   };
 }());
 </script>
-<script src="godot.js" onerror="document.getElementById('stat').textContent='godot.js failed to load'"></script>
-<script>if (window.__bootTransect) window.__bootTransect();</script>
+<script>
+// The chosen runtime's loader, then the boot (the page may be reloading
+// under the isolation worker first: then nothing starts here).
+(function () {
+  if (window.__trIsolating) return;
+  var exe = (window.__trRuntime === "threaded") ? "godot-mt" : "godot";
+  var s = document.createElement("script");
+  s.src = exe + ".js";
+  s.onload = function () { if (window.__bootTransect) window.__bootTransect(); };
+  s.onerror = function () { document.getElementById("stat").textContent = exe + ".js failed to load"; };
+  document.body.appendChild(s);
+})();
+</script>

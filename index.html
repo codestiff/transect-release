@@ -206,6 +206,33 @@
 // shows none of the developer's lines, and takes no scene from its address;
 // `?dev` gives them back, as it gives the game its tools.
 var MODE = "public";
+// THE WALK'S RECORD (src/delivery/walk_post.gd, docs/plans/111): the game
+// hands the latest record of the walk here, allowed or not; the page sends
+// it to the collector (the build's TRANSECT_COLLECTOR_URL) once, when the walk
+// ends or the page goes away mid-walk. No address, nothing is sent: the
+// record stays on the device.
+window.__trCollector = "";
+(function () {
+  var pending = null, sent = false;
+  function send() {
+    if (sent || !pending || !window.__trCollector) return;
+    sent = true;
+    var body = pending;
+    try {
+      if (!(navigator.sendBeacon && navigator.sendBeacon(window.__trCollector, new Blob([body], { type: "text/plain" }))))
+        fetch(window.__trCollector, { method: "POST", body: body, keepalive: true, headers: { "content-type": "text/plain" } }).catch(function () {});
+    } catch (e) {}
+  }
+  window.__trWalk = function (json, final, allowed) {
+    var walk = null;
+    try { walk = JSON.parse(json).walk; } catch (e) {}
+    if (walk !== window.__trWalkId) sent = false;  // a new walk
+    window.__trWalkId = walk;
+    pending = allowed ? json : null;
+    if (final) { send(); pending = null; }
+  };
+  window.addEventListener("pagehide", send);
+})();
 // The game puts the spinner away when its valley is ready (src/main.gd).
 window.__trLoaded = function () { var b = document.getElementById("busy"); if (b) b.className = "gone"; };
 var DEV = MODE === "dev" || /[?&]dev(=|&|$)/.test(location.search);
@@ -625,16 +652,19 @@ if (navigator.getBattery) {
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-221b9478aa80.pck";
-  var PCK_BYTES = 11150208;
-  var BUILD = "transect 0.1.2 cae21761a3  |  lib ba306d5";
+  var PCK = "transect-663bfc078b5a.pck";
+  var PCK_BYTES = 11480484;
+  var BUILD = "transect 0.1.3 94743e588a  |  lib 2b25705";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
+  // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
+  // so a build of the same code keeps the plants the device already has.
+  window.__trCommit = "main df0c8d2+";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
   var diag = document.getElementById("diag");
-  document.getElementById("stamp").textContent = BUILD + (MT ? "  |  threads" : "");
+  document.getElementById("stamp").textContent = BUILD + "  |  " + window.__trCommit + (MT ? "  |  threads" : "");
 
   function setBar(f) { bar.style.width = (Math.max(0, Math.min(1, f)) * 100).toFixed(1) + "%"; }
   function mb(b) { return (b / 1048576).toFixed(1) + " MB"; }

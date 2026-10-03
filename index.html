@@ -679,10 +679,10 @@ if (navigator.getBattery) {
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-4ad52dcf3b44.pck";
-  var PCK_BYTES = 11549628;
+  var PCK = "transect-675796cd6c0c.pck";
+  var PCK_BYTES = 11685156;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-4ad52dcf3b44.0.pck", "transect-4ad52dcf3b44.1.pck"];
+  var PCK_PARTS = ["transect-675796cd6c0c.0.pck", "transect-675796cd6c0c.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -720,12 +720,12 @@ if (navigator.getBattery) {
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.6 a0a09c7d86  |  lib 05556bb";
+  var BUILD = "transect 0.1.7 b604ee5fb0  |  lib 1e5b352";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "main 96ec574+";
+  window.__trCommit = "main c675aa0+";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
@@ -840,7 +840,17 @@ if (navigator.getBattery) {
     window.__trSetState = SET_PCK ? "fetching " + SET_PCK : "none in this build";
     // Said on every progress line after, so the valley's count does not hide it.
     var setNote = "";
-    var setReady = !SET_PCK ? Promise.resolve() : getPart(SET_PCK).then(function (ab) {
+    // AFTER THE VALLEY, NEVER BEFORE (plan 108 step 4): the game's own pack
+    // comes first and alone; the set's fetch begins once it has arrived, so an
+    // optional 7 MB never slows the files the walk cannot start without. A
+    // valley that fails is the start's failure, said by the start; the set is
+    // then not fetched at all.
+    function fetchSet() {
+      stat.textContent = "set  fetching " + mb(SET_BYTES);
+      return getPart(SET_PCK);
+    }
+    var setReady = !SET_PCK ? Promise.resolve() : getPck().then(fetchSet, function () { return null; }).then(function (ab) {
+      if (ab === null) return;
       window.__trSetPath = SET_PATH;
       window.__trSetState = "fetched " + SET_PCK + " (" + mb(ab.byteLength) + ")";
       return engine.preloadFile(ab, SET_PATH);

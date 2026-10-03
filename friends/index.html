@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<!-- THE FRIENDS-AND-FAMILY PAGE (docs/plans/119 step 3): the link the owner
+     sends, served at /friends/ beside the game. The paragraph is the press
+     kit's (the library's docs/press/README.md, "The paragraph", the draft of
+     2026-10-03), its bracketed blanks struck rather than filled: no studio
+     name yet, and the link to play is the button under it. The coffee
+     button's address is the game's (src/delivery/links.json, written in by
+     tools/pack-web.py), hidden while empty. No account's email. -->
+<title>Transect, for friends</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#121618">
+<meta name="description" content="A free first-person walk through a northern valley that no one built by hand: a night out alone, in a browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23121618'/%3E%3Ccircle cx='46' cy='18' r='7' fill='%23f3ead2'/%3E%3Cpath d='M0 52 L18 26 L30 40 L42 22 L64 50 L64 64 L0 64Z' fill='%236b9e4a'/%3E%3Cpath d='M0 58 Q32 46 64 58 L64 64 L0 64Z' fill='%23a87c4f'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Spectral:ital,wght@0,500;1,400&display=swap">
+<style>
+  /* The game's page's look: dusk in a wooded valley, dark in every theme. */
+  :root {
+    color-scheme: dark;
+    --ground: #0e1411;
+    --surface: #17201b;
+    --line: #2a372f;
+    --ink: #e2e9e0;
+    --muted: #93a498;
+    --fern: #86b98f;
+    --ochre: #d6a25f;
+  }
+  [hidden] { display: none !important; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font: 14px/1.6 "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+    padding: calc(36px + env(safe-area-inset-top, 0px)) 16px calc(40px + env(safe-area-inset-bottom, 0px));
+  }
+  main { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 26px; }
+  h1 {
+    margin: 0; font-family: "Spectral", Georgia, "Times New Roman", serif; font-weight: 500;
+    font-size: clamp(44px, 11vw, 72px); line-height: 1; letter-spacing: -0.01em;
+  }
+  .lede {
+    margin: 0; font-family: "Spectral", Georgia, serif; font-size: 18px; line-height: 1.6;
+    text-wrap: pretty;
+  }
+  .lede em { font-style: italic; }
+  .go { display: flex; flex-wrap: wrap; gap: 12px; }
+  a.button {
+    display: inline-flex; align-items: center; min-height: 48px; padding: 12px 22px;
+    font: 500 15px "IBM Plex Mono", ui-monospace, monospace; text-decoration: none;
+    color: var(--ground); background: var(--fern);
+  }
+  a.button.quiet { color: var(--ink); background: var(--surface); border: 1px solid var(--line); }
+  a.button:focus-visible { outline: 2px solid var(--ochre); outline-offset: 2px; }
+  h2 { margin: 0 0 6px; font-size: 14px; font-weight: 500; letter-spacing: 0.04em; color: var(--ochre); }
+  ul { margin: 0; padding-left: 1.2em; }
+  li { margin: 4px 0; }
+  .how { color: var(--muted); }
+  .how b { color: var(--ink); font-weight: 500; }
+  a { color: var(--fern); }
+  footer { font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Transect</h1>
+
+  <p class="lede"><strong>Transect</strong> is a free first-person walk through a northern valley that
+  no one built by hand. Every birch, pine, fern and boulder in it comes from
+  an open library of plant and stone generators, each one measured from a
+  photograph, so the valley is different at every seed and true to the
+  places it was drawn from. The game is a night out alone: you carry a pack,
+  gather deadwood, lay and light a fire, pitch a tent before the cold
+  arrives, and write the night into a journal. The sky is computed rather
+  than painted &mdash; the Sun and Moon where they would be on that day, storms
+  with held lightning, and on some nights the northern lights &mdash; and every
+  sound is a CC0 field recording. It runs in a browser, on a phone or a
+  desktop, and costs nothing. Transect is made by a one-person studio,
+  and is the free prologue to <em>Norge: Tales of the North</em>,
+  a game about keeping a cold coast alive.</p>
+
+  <div class="go">
+    <a class="button" href="../">Walk into the valley</a>
+    <a class="button quiet" href="../request/">Ask for a plant</a>
+    <a class="button quiet" id="coffee" href="#" target="_blank" rel="noopener" hidden>Buy us a coffee</a>
+  </div>
+
+  <section class="how">
+    <h2>Before you go</h2>
+    <ul>
+      <li><b>Give it a moment to load</b>: the valley grows on your device while you read the start card.</li>
+      <li><b>Sound on</b> if you can: the wind, the stream and the fire are most of it.</li>
+      <li><b>Try to see the dawn.</b> The cold is the thing to beat.</li>
+      <li><b>Tell me what you think</b> with the Feedback button on the start card, or what went wrong, the moment it does.</li>
+      <li>On a phone, <b>Add to Home Screen</b> opens it full screen next time.</li>
+    </ul>
+  </section>
+
+  <footer>Thank you for walking it first.</footer>
+</main>
+<script id="config" type="application/json">{"sponsor": ""}</script>
+<script>
+(() => {
+  let config = {};
+  try { config = JSON.parse(document.getElementById("config").textContent); } catch (e) { config = {}; }
+  const sponsor = String(config.sponsor || "");
+  if (/^https:\/\//.test(sponsor)) {
+    const a = document.getElementById("coffee");
+    a.href = sponsor;
+    a.hidden = false;
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,4 +1,18 @@
 <title>transect</title>
+<!-- THE TAB'S ICON (docs/plans/089): a valley under the moon, inline -- no
+     file to fetch, and no favicon.ico asked for and missing. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23121618'/%3E%3Ccircle cx='46' cy='18' r='7' fill='%23f3ead2'/%3E%3Cpath d='M0 52 L18 26 L30 40 L42 22 L64 50 L64 64 L0 64Z' fill='%236b9e4a'/%3E%3Cpath d='M0 58 Q32 46 64 58 L64 64 L0 64Z' fill='%23a87c4f'/%3E%3C/svg%3E">
+<!-- A GAME ON THE HOME SCREEN (docs/plans/091): added there, it opens full
+     screen, no address bar -- the manifest's "fullscreen" on Android, the
+     apple-mobile-web-app tags on an iPhone (Share, Add to Home Screen). The
+     service worker an install asks for is coi.js's (plan 055). -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#121618">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Transect">
 <!-- THE PAGE IS AS WIDE AS THE PHONE. Without this a mobile browser lays the
      page out 980 px wide and zooms it to fit: the game draws correctly, but
      touches reach it in the unzoomed coordinates, so on a 844 px-wide phone a
@@ -611,9 +625,9 @@ if (navigator.getBattery) {
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-93f0a5ce2333.pck";
-  var PCK_BYTES = 11067060;
-  var BUILD = "transect 0.1.0 578321cb93  |  lib b84a738";
+  var PCK = "transect-9f1e761f5128.pck";
+  var PCK_BYTES = 11079060;
+  var BUILD = "transect 0.1.1 6cb1e9beb8  |  lib a7f28b5";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
 

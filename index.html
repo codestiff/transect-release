@@ -670,14 +670,22 @@ if (navigator.getBattery) {
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-14fa92b7d84a.pck";
-  var PCK_BYTES = 11517800;
-  var BUILD = "transect 0.1.4 991f5064dc  |  lib 0c07f9a";
+  var PCK = "transect-ac28b6a0e435.pck";
+  var PCK_BYTES = 11544060;
+  // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
+  var PCK_PARTS = ["transect-ac28b6a0e435.0.pck", "transect-ac28b6a0e435.1.pck"];
+  // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
+  // one: preloaded into the engine's files, and mounted by the game
+  // (src/delivery/packs.gd) before the valley asks for a rung.
+  var SET_PCK = "";
+  var SET_BYTES = 0;
+  var SET_PATH = "/tmp/transect-set.pck";
+  var BUILD = "transect 0.1.5 4727a66229  |  lib 05556bb";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "main ed66fa1+";
+  window.__trCommit = "main d9234c1+";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
@@ -729,12 +737,35 @@ if (navigator.getBattery) {
     })();
     return wasmPromise;
   }
+  // THE VALLEY'S PACK IN PARTS (docs/plans/108 M4): fetched in turn and
+  // handed to the engine under its one name. Its progress is the engine's.
+  var pckPromise = null;
+  function getPck() {
+    if (pckPromise) return pckPromise;
+    pckPromise = Promise.all(PCK_PARTS.map(function (part) {
+      return realFetch(part).then(function (r) {
+        if (!r.ok) throw new Error(part + " returned HTTP " + r.status);
+        return r.arrayBuffer();
+      });
+    })).then(function (abs) {
+      var buf = new Uint8Array(PCK_BYTES), at = 0;
+      abs.forEach(function (ab) { buf.set(new Uint8Array(ab), at); at += ab.byteLength; });
+      if (at !== PCK_BYTES) throw new Error("the valley reassembled to " + at + " B, expected " + PCK_BYTES);
+      return buf;
+    });
+    return pckPromise;
+  }
   var realFetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
     var url = (typeof input === "string") ? input : (input && input.url) || "";
     if (/godot(-mt)?\.wasm(\?|$)/.test(url)) {
       return getWasm().then(function (b) {
         return new Response(b.slice().buffer, { status: 200, headers: { "Content-Type": "application/wasm" } });
+      });
+    }
+    if (PCK_PARTS.length > 1 && url.split("?")[0].split("/").pop() === PCK) {
+      return getPck().then(function (b) {
+        return new Response(b.buffer, { status: 200, headers: { "Content-Type": "application/octet-stream", "Content-Length": String(PCK_BYTES) } });
       });
     }
     return realFetch(input, init);
@@ -762,7 +793,7 @@ if (navigator.getBattery) {
       ensureCrossOriginIsolationHeaders: false,
       executable: EXE,
       experimentalVK: false,
-      fileSizes: (function () { var o = {}; o[PCK] = PCK_BYTES; o[EXE + ".wasm"] = WASM_BYTES; return o; })(),
+      fileSizes: (function () { var o = {}; o[PCK] = PCK_BYTES; o[EXE + ".wasm"] = WASM_BYTES; if (SET_PCK) o[SET_PCK] = SET_BYTES; return o; })(),
       focusCanvas: true,
       gdextensionLibs: [],
       mainPack: PCK
@@ -770,6 +801,10 @@ if (navigator.getBattery) {
     var missing = Engine.getMissingFeatures ? Engine.getMissingFeatures({ threads: MT }) : [];
     if (missing.length) { fail("This browser is missing features the engine needs.", missing.join("\n")); return; }
     stat.textContent = "engine  starting";
+    if (SET_PCK) {
+      window.__trSetPath = SET_PATH;
+      engine.preloadFile(SET_PCK, SET_PATH);
+    }
     engine.startGame({
       onProgress: function (cur, total) {
         if (cur > 0 && total > 0) {

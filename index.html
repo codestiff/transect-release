@@ -493,6 +493,24 @@ if (navigator.getBattery) {
   setInterval(beat, 5000);
   document.addEventListener("visibilitychange", function () { beat("now " + document.visibilityState); });
   window.addEventListener("pagehide", function () { flight.clean = true; beat("page closed"); });
+
+  // THE SAVE ON HIDING (docs/plans/108 step 6). The engine copies the game's
+  // files to IndexedDB on the frame after each write, and a hidden page draws
+  // no frames: iOS closes a hidden page (a home-screen app swiped away, a tab
+  // dropped for memory) with the last save never copied. So the game writes
+  // the night and starts the copy now, inside this event (window.__tr_hidden,
+  // src/main.gd). Asked for persistence too, where it is the app on the home
+  // screen: there the browser grants it without asking, so nothing prompts.
+  function trHidden() {
+    if (window.__tr_hidden) { try { window.__tr_hidden(); } catch (e) { beat("save on hiding failed: " + e); } }
+  }
+  document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") trHidden(); });
+  window.addEventListener("pagehide", trHidden);
+  var standalone = navigator.standalone === true ||
+    (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  if (standalone && navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().then(function (granted) { beat("storage persisted: " + granted); }).catch(function () {});
+  }
   window.addEventListener("pageshow", function (e) { if (e.persisted) { flight.clean = false; beat("page back"); } });
   function crashText(c) {
     if (!c) return "";
@@ -652,14 +670,14 @@ if (navigator.getBattery) {
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-663bfc078b5a.pck";
-  var PCK_BYTES = 11480484;
-  var BUILD = "transect 0.1.3 94743e588a  |  lib 2b25705";
+  var PCK = "transect-14fa92b7d84a.pck";
+  var PCK_BYTES = 11517800;
+  var BUILD = "transect 0.1.4 991f5064dc  |  lib 0c07f9a";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "main df0c8d2+";
+  window.__trCommit = "main ed66fa1+";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");

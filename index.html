@@ -551,6 +551,15 @@ if (navigator.getBattery) {
     lines.push("page up " + stamp() + ", visible: " + document.visibilityState);
     lines.push("memory: " + memLine());
     lines.push("");
+    // ON THE DEVICE (docs/plans/136): each cache the walk keeps or reads.
+    lines.push("== on-device caches");
+    lines.push("build: " + (window.__trBuild || "?") + "  |  commit " + (window.__trCommit || "?"));
+    lines.push("set fetch: " + (window.__trSetState || "none in this build"));
+    var caches = {};
+    try { caches = JSON.parse(window.__trCaches || "{}"); } catch (e) { caches = {}; }
+    lines.push("baked set: " + (caches.set || "not reported by the game"));
+    lines.push("rung store: " + (caches.rungs || "not reported by the game"));
+    lines.push("");
     if (crash) { lines.push(crashText(crash)); lines.push(""); }
     lines.push("== audio");
     lines.push("contexts: " + AUDIO.contexts.length);
@@ -670,22 +679,53 @@ if (navigator.getBattery) {
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-ac28b6a0e435.pck";
-  var PCK_BYTES = 11544060;
+  var PCK = "transect-4ad52dcf3b44.pck";
+  var PCK_BYTES = 11549628;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-ac28b6a0e435.0.pck", "transect-ac28b6a0e435.1.pck"];
+  var PCK_PARTS = ["transect-4ad52dcf3b44.0.pck", "transect-4ad52dcf3b44.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
   var SET_PCK = "";
   var SET_BYTES = 0;
   var SET_PATH = "/tmp/transect-set.pck";
-  var BUILD = "transect 0.1.5 4727a66229  |  lib 05556bb";
+  // WHAT A FAILED FETCH SAYS (docs/plans/136). Each names the file and its
+  // HTTP status. A part that is gone (404) means a newer build replaced this
+  // one: on the home screen the app must be closed and opened again, since a
+  // standalone app keeps its old page; in a tab a reload is enough.
+  var WORDS = {
+    setMissing: "set not fetched, building live",
+    newBuildApp: "A new build of the walk is out. Close the app completely (swipe it away) and open it again.",
+    newBuildTab: "A new build of the walk is out. Reload the page to get it."
+  };
+  function standalone() {
+    try { return window.navigator.standalone === true || matchMedia("(display-mode: standalone)").matches; } catch (e) { return false; }
+  }
+  function getPart(part) {
+    return realFetch(part).then(function (r) {
+      if (!r.ok) {
+        var e = new Error(part + " returned HTTP " + r.status);
+        e.status = r.status;
+        e.part = part;
+        throw e;
+      }
+      return r.arrayBuffer();
+    });
+  }
+  // A fetch that failed, in words: the file, the status, and when it is a
+  // part gone, that a new build is out.
+  function fetchWords(err) {
+    var msg = String((err && err.message) || err);
+    if (err && err.status === 404) msg += "\n\n" + (standalone() ? WORDS.newBuildApp : WORDS.newBuildTab);
+    return msg;
+  }
+  window.__trFetchWords = fetchWords;
+  var BUILD = "transect 0.1.6 a0a09c7d86  |  lib 05556bb";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "main d9234c1+";
+  window.__trCommit = "main 96ec574+";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
@@ -722,10 +762,7 @@ if (navigator.getBattery) {
           return buf;
         }
         var part = PARTS[i++];
-        return fetch(part).then(function (r) {
-          if (!r.ok) throw new Error(part + " returned HTTP " + r.status);
-          return r.arrayBuffer();
-        }).then(function (ab) {
+        return getPart(part).then(function (ab) {
           buf.set(new Uint8Array(ab), at);
           at += ab.byteLength;
           setBar(at / WASM_BYTES * 0.8);
@@ -742,12 +779,7 @@ if (navigator.getBattery) {
   var pckPromise = null;
   function getPck() {
     if (pckPromise) return pckPromise;
-    pckPromise = Promise.all(PCK_PARTS.map(function (part) {
-      return realFetch(part).then(function (r) {
-        if (!r.ok) throw new Error(part + " returned HTTP " + r.status);
-        return r.arrayBuffer();
-      });
-    })).then(function (abs) {
+    pckPromise = Promise.all(PCK_PARTS.map(getPart)).then(function (abs) {
       var buf = new Uint8Array(PCK_BYTES), at = 0;
       abs.forEach(function (ab) { buf.set(new Uint8Array(ab), at); at += ab.byteLength; });
       if (at !== PCK_BYTES) throw new Error("the valley reassembled to " + at + " B, expected " + PCK_BYTES);
@@ -763,7 +795,7 @@ if (navigator.getBattery) {
         return new Response(b.slice().buffer, { status: 200, headers: { "Content-Type": "application/wasm" } });
       });
     }
-    if (PCK_PARTS.length > 1 && url.split("?")[0].split("/").pop() === PCK) {
+    if (url.split("?")[0].split("/").pop() === PCK) {
       return getPck().then(function (b) {
         return new Response(b.buffer, { status: 200, headers: { "Content-Type": "application/octet-stream", "Content-Length": String(PCK_BYTES) } });
       });
@@ -793,7 +825,7 @@ if (navigator.getBattery) {
       ensureCrossOriginIsolationHeaders: false,
       executable: EXE,
       experimentalVK: false,
-      fileSizes: (function () { var o = {}; o[PCK] = PCK_BYTES; o[EXE + ".wasm"] = WASM_BYTES; if (SET_PCK) o[SET_PCK] = SET_BYTES; return o; })(),
+      fileSizes: (function () { var o = {}; o[PCK] = PCK_BYTES; o[EXE + ".wasm"] = WASM_BYTES; return o; })(),
       focusCanvas: true,
       gdextensionLibs: [],
       mainPack: PCK
@@ -801,15 +833,33 @@ if (navigator.getBattery) {
     var missing = Engine.getMissingFeatures ? Engine.getMissingFeatures({ threads: MT }) : [];
     if (missing.length) { fail("This browser is missing features the engine needs.", missing.join("\n")); return; }
     stat.textContent = "engine  starting";
-    if (SET_PCK) {
+    // THE BAKED SET IS OPTIONAL (docs/plans/136; the owner's iOS app died on
+    // its 404): fetched beside the engine, handed over only when it came, and
+    // the start held only until it settles. A set that does not come is said
+    // on the status line and in the diagnostics, and the walk builds live.
+    window.__trSetState = SET_PCK ? "fetching " + SET_PCK : "none in this build";
+    // Said on every progress line after, so the valley's count does not hide it.
+    var setNote = "";
+    var setReady = !SET_PCK ? Promise.resolve() : getPart(SET_PCK).then(function (ab) {
       window.__trSetPath = SET_PATH;
-      engine.preloadFile(SET_PCK, SET_PATH);
-    }
+      window.__trSetState = "fetched " + SET_PCK + " (" + mb(ab.byteLength) + ")";
+      return engine.preloadFile(ab, SET_PATH);
+    }).catch(function (err) {
+      window.__trSetPath = "";
+      window.__trSetState = WORDS.setMissing + ": " + String((err && err.message) || err);
+      setNote = "  -  " + WORDS.setMissing;
+      stat.textContent = WORDS.setMissing;
+    });
+    var realStart = engine.start;
+    engine.start = function () {
+      var self = this, args = arguments;
+      return setReady.then(function () { return realStart.apply(self, args); });
+    };
     engine.startGame({
       onProgress: function (cur, total) {
         if (cur > 0 && total > 0) {
           setBar(0.8 + 0.2 * cur / total);
-          stat.textContent = "valley  " + mb(cur) + " of " + mb(total);
+          stat.textContent = "valley  " + mb(cur) + " of " + mb(total) + setNote;
         }
       }
     }).then(function () {
@@ -817,7 +867,7 @@ if (navigator.getBattery) {
       document.getElementById("boot").hidden = true;
       document.getElementById("canvas").focus();
     }, function (err) {
-      fail("The walk failed to start.", String((err && err.message) || err));
+      fail("The walk failed to start.", fetchWords(err));
     });
   };
 }());

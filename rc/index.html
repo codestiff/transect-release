@@ -610,7 +610,7 @@ if (navigator.getBattery) {
   // over the spinner and the bar now, with what is known, Reload and Copy
   // report on it. Its state is page/watchdog.js; its rules and words,
   // src/delivery/watchdog.json.
-  var DOG_RULES = {"_what": "THE PAGE'S WATCHDOG (docs/plans/181; dispatch row 103, 'A crash is never a spinner'): what replaces the spinner and the bar with the crash card, and the card's words. page/watchdog.js reads these (tools/pack-web.py puts them in the page); test/suite_delivery.gd plays its states against them. A stall is the heartbeat silent for `stall_s` on a visible page: the download's progress while loading, the game's frame tick (src/delivery/walk_post.gd, TrHeartbeat) while playing. A page that was itself frozen (the watchdog's own check late by `frozen_s`) is not a stall: the clock starts again.", "stall_s": 30, "check_s": 2, "frozen_s": 6, "tick_s": 1, "oom": "out of memory|cannot enlarge memory|array buffer allocation failed|\\boom\\b", "words": {"oom": "The game stopped. This device may be out of memory.", "abort": "The game stopped unexpectedly.", "frame-stall": "The game stopped. This device may be out of memory.", "load-stall": "The download stalled; check the connection."}, "reload": "Reload", "copy": "Copy report"};
+  var DOG_RULES = {"_what": "THE PAGE'S WATCHDOG (docs/plans/181; dispatch row 103, 'A crash is never a spinner'): what replaces the spinner and the bar with the crash card, and the card's words. page/watchdog.js reads these (tools/pack-web.py puts them in the page); test/suite_delivery.gd plays its states against them. A stall is the heartbeat silent for `stall_s` on a visible page: the download's progress while loading, the game's frame tick (src/delivery/walk_post.gd, TrHeartbeat) while playing. A page that was itself frozen (the watchdog's own check late by `frozen_s`) is not a stall: the clock starts again. THE DEVICE'S CARD (docs/plans/211; dispatch row 129): `need_mb` is what the walk needs of the device (the web bench's working heap, 322 MB, test/ledger/perf_ledger/web-review.json, with room); page/memprobe.js grows a probe toward it in `probe_step_mb` steps before the engine is fetched, and `words.device` says what it needs and what the device gave.", "stall_s": 30, "check_s": 2, "frozen_s": 6, "tick_s": 1, "oom": "out of memory|cannot enlarge memory|array buffer allocation failed|\\boom\\b", "words": {"oom": "The game stopped. This device may be out of memory.", "abort": "The game stopped unexpectedly.", "frame-stall": "The game stopped. This device may be out of memory.", "load-stall": "The download stalled; check the connection.", "device": "This device could not give the game the memory it needs. The walk needs about {need} MB; {gave}. Our apologies. It plays in a desktop browser or on a recent phone. Copy the report and send it to us.", "device_gave": "this device gave {gave} MB", "device_silent": "this device would not say how much it can give"}, "reload": "Reload", "copy": "Copy report", "need_mb": 384, "probe_step_mb": 64};
   // THE PAGE'S WATCHDOG (docs/plans/181; dispatch row 103, "A crash is never a
 // spinner"): a crash, an abort or a heartbeat gone silent replaces the spinner
 // and the bar with the crash card, at once, not on the next load. This is the
@@ -670,6 +670,7 @@ function TrWatchdog(rules, now) {
 if (typeof module !== "undefined") module.exports = TrWatchdog;
 
   var DOG = TrWatchdog(DOG_RULES, Date.now());
+  window.__trDogRules = DOG_RULES;
   var fired = null;
   function dogEvent(kind, text) { if (DOG) caught(DOG.event(kind, text, Date.now())); }
   window.__trTick = function (kind) { DOG.tick(kind, Date.now()); };
@@ -687,8 +688,59 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
       ", device " + (navigator.deviceMemory || "?") + " GB";
     return (f.cause === "frame-stall" ? "no frame for " + f.idle_s + " s, " : "") + b;
   }
+  // THE DEVICE'S CARD (docs/plans/211; row 129): the device could not give
+  // the game its memory -- what it needs, what it gave or that it would not
+  // say, the other ways to play -- over the spinner and the bar, with one
+  // button: the report. No reload: the same device would only fail again.
+  window.__trDeviceCard = function (words, probe) {
+    if (fired) return;
+    fired = { cause: "device" };
+    DOG.stop();
+    var busy = document.getElementById("busy");
+    if (busy) busy.className = "gone";
+    document.getElementById("boot").hidden = true;
+    document.getElementById("crash-text").textContent = words;
+    var copyB = document.getElementById("crash-copy"), closeB = document.getElementById("crash-close");
+    var copyN = copyB.cloneNode(false);
+    copyN.textContent = DOG_RULES.copy;
+    copyB.replaceWith(copyN);
+    closeB.hidden = true;
+    copyN.addEventListener("click", function () {
+      var p = probe || {};
+      var text = ["== this device could not give the game the memory it needs (the page's measure)",
+        "needs about " + p.need_mb + " MB; " + (p.gave_mb == null ? "the device would not say what it can give" : "the device gave " + p.gave_mb + " MB"),
+        "the threaded runtime's shared memory: " + (p.threads ? "granted" : "refused or not offered"),
+        p.forced ? "shown on purpose (?dev&oom=1)" : "",
+        "memory now: " + memLine(), "cores: " + (navigator.hardwareConcurrency || "?") + ", device memory: " + (navigator.deviceMemory ? navigator.deviceMemory + " GB" : "not told"),
+        "build: " + (document.getElementById("stamp").textContent || "?"), "user agent: " + navigator.userAgent,
+        "-- the last log lines:"].concat(LOG.slice(-40)).filter(function (l) { return l !== ""; }).join("\n");
+      copyText(text, document.getElementById("crash-text"), document.getElementById("report-text"));
+    });
+    document.getElementById("crash").hidden = false;
+    copyN.focus();
+  };
   function caught(f) {
     if (!f || fired) return;
+    // OUT OF MEMORY WHILE LOADING (row 129): a threaded start tries once more
+    // single-threaded; a single-threaded one is the device's card, with the
+    // heap the engine reached as what the device gave.
+    if (f.cause === "oom" && f.phase === "loading") {
+      var single = false;
+      try { single = sessionStorage.getItem("tr-single") === "1"; } catch (e) { single = true; }
+      if (window.__trRuntime === "threaded" && !single) {
+        try { sessionStorage.setItem("tr-single", "1"); } catch (e) {}
+        fired = f;
+        beat("watchdog: out of memory threaded; once more single-threaded");
+        location.reload();
+        return;
+      }
+      high();
+      var gave = MEM.wasmHigh > 0 ? Math.round(MEM.wasmHigh / 1048576) : null;
+      var probe = { need_mb: DOG_RULES.need_mb, gave_mb: gave, threads: window.__trRuntime === "threaded" };
+      window.__trDeviceCard(DOG_RULES.words.device.replace("{need}", DOG_RULES.need_mb)
+        .replace("{gave}", gave == null ? DOG_RULES.words.device_silent : DOG_RULES.words.device_gave.replace("{gave}", gave)), probe);
+      return;
+    }
     fired = f;
     high();
     var rec = { cause: f.cause, phase: f.phase, idle_s: f.idle_s, binding: binding(f),
@@ -895,15 +947,77 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
   // ONE RUNTIME OF TWO (docs/plans/055): the threaded one when the page is
   // isolated and the build ships it, else the single-threaded one.
   var PARTS_MT = ["godot-mt.0.wasm", "godot-mt.1.wasm", "godot-mt.2.wasm", "godot-mt.3.wasm"];
-  var MT = !!PARTS_MT && self.crossOriginIsolated === true;
+  // CAN THIS DEVICE GIVE THE GAME ITS MEMORY? (docs/plans/211; dispatch row
+  // 129): measured before a byte of the engine is fetched -- the threaded
+  // runtime's shared memory first, then the single-threaded runtime's own;
+  // the runtime that can have its memory is the one loaded, and when neither
+  // can, the device's card says so in plain words, with the two numbers.
+  // `?dev&oom=1` shows that card on any device (the review's way to see it).
+  // CAN THIS DEVICE GIVE THE GAME ITS MEMORY? (docs/plans/211; dispatch row 129,
+// the owner 2026-10-04: "the game isn't supported on this device, memory
+// requirements are X of Y ... solve this for the class of problems, not just
+// this instance"). The class is "the runtime cannot get its memory", so it is
+// measured, never guessed from a device's name, before a byte of the engine
+// is fetched:
+//   - the threaded runtime asks for shared memory up to its maximum at once
+//     (godot-mt.js: 32 MB, growable to 2 GB, shared); if the device refuses
+//     that reservation, the single-threaded runtime is tried;
+//   - the single-threaded runtime grows its own memory; a plain memory is
+//     grown here in steps toward what the walk needs (`need_mb`,
+//     src/delivery/watchdog.json: the web bench's working heap with room), and
+//     how far it got is what the device gave;
+//   - only when both fail is the device's card shown.
+// The probes' memory is let go at once (no reference is kept). No page of its
+// own: `W` is WebAssembly, or a suite's stand-in (test/suite_delivery.gd).
+var TR_PAGE_MB = 1 / 16; // one wasm page, 64 KiB
+function trMemoryProbe(W, rules, threadsOffered) {
+  var out = { threads: false, single: false, need_mb: rules.need_mb, gave_mb: null, runtime: "none" };
+  if (threadsOffered) {
+    try {
+      new W.Memory({ initial: 512, maximum: 32768, shared: true });
+      out.threads = true;
+    } catch (e) { out.threads = false; }
+  }
+  var have = 0;
+  try {
+    var m = new W.Memory({ initial: 512, maximum: 32768 });
+    have = 32;
+    var step = rules.probe_step_mb / TR_PAGE_MB;
+    while (have < rules.need_mb) {
+      try { m.grow(step); have += rules.probe_step_mb; } catch (e) { break; }
+    }
+    m = null;
+  } catch (e) { have = 0; }
+  out.gave_mb = have > 0 ? have : null;
+  out.single = have >= rules.need_mb;
+  out.runtime = out.threads ? "threaded" : (out.single ? "single" : "none");
+  return out;
+}
+// The device's card, in the page's own words: what the walk needs and what
+// the device gave, or that it would not say; the other ways to play.
+function trDeviceWords(rules, needMb, gaveMb) {
+  var gave = (gaveMb == null) ? rules.words.device_silent : rules.words.device_gave.replace("{gave}", Math.round(gaveMb));
+  return rules.words.device.replace("{need}", Math.round(needMb)).replace("{gave}", gave);
+}
+if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryProbe, trDeviceWords: trDeviceWords };
+
+  var MEM_RULES = window.__trDogRules;
+  var singleAfterOom = false;
+  try { singleAfterOom = sessionStorage.getItem("tr-single") === "1"; } catch (e) { singleAfterOom = false; }
+  var offered = !!PARTS_MT && self.crossOriginIsolated === true && !singleAfterOom;
+  var PROBE = (typeof DEV !== "undefined" && DEV && /[?&]oom=1(&|$)/.test(location.search))
+    ? { threads: false, single: false, need_mb: MEM_RULES.need_mb, gave_mb: null, runtime: "none", forced: true }
+    : (typeof WebAssembly === "object" ? trMemoryProbe(WebAssembly, MEM_RULES, offered) : null);
+  window.__trProbe = PROBE;
+  var MT = !!PROBE && PROBE.runtime === "threaded";
   var EXE = MT ? "godot-mt" : "godot";
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-444b39acd5ce.pck";
-  var PCK_BYTES = 12335044;
+  var PCK = "transect-abe07231373d.pck";
+  var PCK_BYTES = 12335764;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-444b39acd5ce.0.pck", "transect-444b39acd5ce.1.pck"];
+  var PCK_PARTS = ["transect-abe07231373d.0.pck", "transect-abe07231373d.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -969,12 +1083,12 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.7 6327f2a17c  |  lib de0740c";
+  var BUILD = "transect 0.1.7 4af0743a2f  |  lib de0740c";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "delivery/rc-unversioned 7b1707f+";
+  window.__trCommit = "delivery/rc-unversioned 639f325+";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
@@ -1088,6 +1202,12 @@ if (typeof module !== "undefined") module.exports = { TrRate: TrRate, trRateWord
     fail("This browser cannot run the walk.",
       "It needs WebAssembly and WebGL 2. On iOS, WebGL 2 needs iOS 15 or later, " +
       "and can be off in Low Power Mode or a private window.");
+    return;
+  }
+  if (PROBE && PROBE.runtime === "none") {
+    // Nothing is fetched: the engine could not have its memory here.
+    window.__trIsolating = true;
+    window.__trDeviceCard(trDeviceWords(MEM_RULES, PROBE.need_mb, PROBE.gave_mb), PROBE);
     return;
   }
 

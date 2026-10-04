@@ -900,10 +900,10 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-09aae6a0b01c.pck";
-  var PCK_BYTES = 12321468;
+  var PCK = "transect-444b39acd5ce.pck";
+  var PCK_BYTES = 12335044;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-09aae6a0b01c.0.pck", "transect-09aae6a0b01c.1.pck"];
+  var PCK_PARTS = ["transect-444b39acd5ce.0.pck", "transect-444b39acd5ce.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -969,12 +969,12 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.7 04b6419870  |  lib de0740c";
+  var BUILD = "transect 0.1.7 6327f2a17c  |  lib de0740c";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "delivery/rc-unversioned 1373639";
+  window.__trCommit = "delivery/rc-unversioned 7b1707f+";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
@@ -1151,14 +1151,37 @@ if (typeof module !== "undefined") module.exports = { TrRate: TrRate, trRateWord
     }
     // SCENES BY URL: ?storm=1&hour=23 and the like become the game's own
     // review arguments (src/main.gd), so a link can open a given scene.
+    // ... and `?dev`, the developer's mode for this run (page/args.js).
+    // THE ENGINE'S ARGUMENTS FROM THE ADDRESS (docs/plans/210; dispatch row 125,
+// the owner 2026-10-04 16:45: "yeah, let's add it, for small infra tooling
+// like this"). In a dev page (`DEV`: a dev build, or `?dev`), the scene keys
+// become the game's review arguments (src/main.gd), as before; and `?dev` in
+// the address also gives a build for players its dev mode (`--mode=dev`, the
+// free walk) and turns the game's developer mode on for this run
+// (`--developer=on`, TrRamp.review, never saved), so the start card offers
+// the places without the stamp's seven taps -- on an iPad with no console.
+// A page without `DEV` passes nothing, as ever (plan 025). No page of its
+// own, so the suite plays it (test/suite_delivery.gd, under node).
+var TR_SCENE_KEYS = ["hour", "day", "clouds", "mist", "rain", "storm", "strike", "heading", "pitch", "zoom", "north", "east",
+  "quality", "bench", "power", "aurora", "shelter", "torch", "beds", "wind"];
+function trEngineArgs(dev, search) {
+  var args = [];
+  if (!dev) return args;
+  var q = new URLSearchParams(search || "");
+  TR_SCENE_KEYS.forEach(function (k) {
+    if (q.has(k)) args.push("--" + k + "=" + q.get(k));
+  });
+  // The dev mode (TrProduct reads --mode= from its arguments, where it is
+  // certain at start; its own look at the address was found not to take in a
+  // build for players, 2026-10-04) and the developer's mode for this run.
+  if (q.has("dev")) args.push("--mode=dev", "--developer=on");
+  if (args.length) args.unshift("--");
+  return args;
+}
+if (typeof module !== "undefined") module.exports = trEngineArgs;
+
     var args = [];
-    if (DEV) try {
-      var q = new URLSearchParams(location.search);
-      ["hour", "day", "clouds", "mist", "rain", "storm", "strike", "heading", "pitch", "zoom", "north", "east", "quality", "bench", "power", "aurora", "shelter", "torch", "beds", "wind"].forEach(function (k) {
-        if (q.has(k)) args.push("--" + k + "=" + q.get(k));
-      });
-    } catch (e) { /* no query */ }
-    if (args.length) args.unshift("--");
+    try { args = trEngineArgs(DEV, location.search); } catch (e) { args = []; }
     var engine = new Engine({
       args: args,
       canvas: document.getElementById("canvas"),

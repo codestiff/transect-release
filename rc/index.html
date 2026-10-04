@@ -887,10 +887,10 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-967df18053b1.pck";
-  var PCK_BYTES = 12242656;
+  var PCK = "transect-f1e3e94ec7b0.pck";
+  var PCK_BYTES = 12245408;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-967df18053b1.0.pck", "transect-967df18053b1.1.pck"];
+  var PCK_PARTS = ["transect-f1e3e94ec7b0.0.pck", "transect-f1e3e94ec7b0.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -956,12 +956,12 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.7 c1ed25f83f  |  lib de0740c";
+  var BUILD = "transect 0.1.7 8f954588fc  |  lib de0740c";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "delivery/rc-unversioned 59a7c49";
+  window.__trCommit = "delivery/rc-unversioned 0a6a3ac";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");

@@ -257,9 +257,14 @@ var MODE = "public";
 window.__trCollector = "";
 (function () {
   var pending = null, sent = false;
+  // What left, for the diagnostics copy (dispatch row 83): a player can see
+  // that nothing was sent, or what was.
+  window.__trSent = { count: 0, last: "" };
   function send() {
     if (sent || !pending || !window.__trCollector) return;
     sent = true;
+    window.__trSent.count++;
+    window.__trSent.last = new Date().toISOString();
     var body = pending;
     try {
       if (!(navigator.sendBeacon && navigator.sendBeacon(window.__trCollector, new Blob([body], { type: "text/plain" }))))
@@ -768,6 +773,14 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
     lines.push("baked set: " + (caches.set || "not reported by the game"));
     lines.push("rung store: " + (caches.rungs || "not reported by the game"));
     lines.push("");
+    // WHAT THIS DEVICE SENT (dispatch row 83): the switch in Settings, and
+    // what left this session -- nothing, unless the player turned it on.
+    lines.push("== diagnostics sent");
+    lines.push("switch (Settings, About): " + (window.__trDiagOn === true ? "on" : window.__trDiagOn === false ? "off" : "not reported yet"));
+    lines.push("sent this session: " + (window.__trSent && window.__trSent.count
+      ? window.__trSent.count + " walk record(s), the last at " + window.__trSent.last : "nothing"));
+    if (!window.__trCollector) lines.push("this build has no server address: nothing can leave");
+    lines.push("");
     if (crash) { lines.push(crashText(crash)); lines.push(""); }
     lines.push("== audio");
     lines.push("contexts: " + AUDIO.contexts.length);
@@ -887,10 +900,10 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-f1e3e94ec7b0.pck";
-  var PCK_BYTES = 12245408;
+  var PCK = "transect-09aae6a0b01c.pck";
+  var PCK_BYTES = 12321468;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-f1e3e94ec7b0.0.pck", "transect-f1e3e94ec7b0.1.pck"];
+  var PCK_PARTS = ["transect-09aae6a0b01c.0.pck", "transect-09aae6a0b01c.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -956,12 +969,12 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.7 8f954588fc  |  lib de0740c";
+  var BUILD = "transect 0.1.7 04b6419870  |  lib de0740c";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "delivery/rc-unversioned 0a6a3ac";
+  window.__trCommit = "delivery/rc-unversioned 1373639";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
@@ -973,19 +986,97 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
   // "why is it taking so long? because we need to download one gigabyte and
   // we're at this much"): the engine's, the valley's and its set's bytes,
   // counted as they stream, and the line says which download binds now.
+  // AND HOW FAST, AND HOW MUCH IS LEFT (docs/plans/203; dispatch row 120,
+  // D-ui-1): the bytes of every download together, their rate over the last
+  // second, said every second -- "downloading the valley, 18.3 of 54.6 MB,
+  // 3.1 MB/s" -- and when nothing has come for five seconds, that, instead
+  // of a line lying still. The rate is page/rate.js.
+  // THE RATE OF A WAIT (docs/plans/203; dispatch row 120, D-ui-1, the owner
+// 2026-10-04 11:00: "measure a derivative of the constraint ... we need X
+// things per second, and we're waiting on Y total"). A count of done things
+// fed as it grows; asked each second, it says how fast it is going now and
+// how much is left, in the wait's own unit. No page and no clock of its own,
+// so the suite plays it (test/suite_delivery.gd, under node); page/shell.html
+// feeds it the bytes and tools/pack-web.py puts it in the page.
+//
+//   TrRate(total, t)   a wait for `total` things, begun at `t` (ms)
+//   .add(n, t)         `n` more done at `t`
+//   .now(t)            {done, total, left, rate (a second, over the last
+//                      second only, never the whole wait's average), still_s
+//                      (seconds since the count last moved), stalled (still
+//                      for STALL_S), eta_s (left / rate, only once the rate
+//                      has held HELD_S without a gap of a second; else -1)}
+//   trRateWords(s, u)  the line's numbers in unit `u` ({name, per, digits}):
+//                      "18.3 of 54.6 MB, 3.1 MB/s, about 12 s left", or
+//                      "18.3 of 54.6 MB, nothing for 7 s" when stalled
+var TR_RATE = { WINDOW_MS: 1000, STALL_S: 5, HELD_S: 3 };
+function TrRate(total, t) {
+  var r = { total: total, done: 0, samples: [[t, 0]], moved: t, held: t };
+  function doneAt(when) {
+    // The count as it stood at `when`: the last sample at or before it.
+    var d = 0;
+    for (var i = 0; i < r.samples.length && r.samples[i][0] <= when; i++) d = r.samples[i][1];
+    return d;
+  }
+  r.add = function (n, at) {
+    // A gap of more than a second without a thing breaks the rate's hold.
+    if (at - r.moved > TR_RATE.WINDOW_MS) r.held = at;
+    r.done = Math.min(r.total, r.done + n);
+    r.moved = at;
+    r.samples.push([at, r.done]);
+    // Kept a little past the window: the rate needs the count a second ago.
+    while (r.samples.length > 2 && r.samples[1][0] < at - TR_RATE.WINDOW_MS * 2) r.samples.shift();
+  };
+  r.now = function (at) {
+    var rate = (r.done - doneAt(at - TR_RATE.WINDOW_MS)) * 1000 / TR_RATE.WINDOW_MS;
+    var still = Math.max(0, (at - r.moved) / 1000);
+    var gap = at - r.moved > TR_RATE.WINDOW_MS;
+    var held = !gap && rate > 0 && (at - r.held) >= TR_RATE.HELD_S * 1000;
+    var left = r.total - r.done;
+    return { done: r.done, total: r.total, left: left, rate: rate, still_s: Math.floor(still),
+      stalled: left > 0 && still >= TR_RATE.STALL_S, eta_s: held ? Math.ceil(left / rate) : -1 };
+  };
+  return r;
+}
+function trRateWords(s, u) {
+  function n(x) { return (x / u.per).toFixed(u.digits); }
+  var words = n(s.done) + " of " + n(s.total) + " " + u.name;
+  if (s.left <= 0) return words;
+  if (s.stalled) return words + ", nothing for " + s.still_s + " s";
+  words += ", " + n(s.rate) + " " + u.name + "/s";
+  if (s.eta_s >= 0) words += ", about " + (s.eta_s >= 90 ? Math.round(s.eta_s / 60) + " min" : s.eta_s + " s") + " left";
+  return words;
+}
+if (typeof module !== "undefined") module.exports = { TrRate: TrRate, trRateWords: trRateWords, TR_RATE: TR_RATE };
+
   var got = { wasm: 0, pck: 0, set: 0 };
+  var RATE = TrRate(WASM_BYTES + PCK_BYTES + (SET_PCK ? SET_BYTES : 0), Date.now());
+  var MB_UNIT = { name: "MB", per: 1048576, digits: 1 };
+  // What binds now; "" when the line is not the downloads' to say.
+  var binding = "";
+  function sayRate() {
+    if (!binding) return;
+    var s = RATE.now(Date.now());
+    if (s.left <= 0) { binding = ""; return; }
+    stat.textContent = binding + ", " + trRateWords(s, MB_UNIT);
+  }
+  var rateClock = setInterval(sayRate, 1000);
+  function rateDone() { binding = ""; clearInterval(rateClock); }
   window.__trSetBytes = moved("set", "downloading the valley's set", SET_BYTES);
   function moved(which, words, of) {
     return function (n) {
       got[which] += n;
-      setBar((got.wasm + got.pck + got.set) / Math.max(1, WASM_BYTES + PCK_BYTES + (SET_PCK ? SET_BYTES : 0)));
-      stat.textContent = words + ", " + Math.round(got[which] / 1048576) + " of " + Math.round(of / 1048576) + " MB";
+      RATE.add(n, Date.now());
+      setBar((got.wasm + got.pck + got.set) / Math.max(1, RATE.total));
+      binding = words;
+      sayRate();
     };
   }
   function mb(b) { return (b / 1048576).toFixed(1) + " MB"; }
   function fail(title, detail) {
     // The page says this failure itself: the watchdog's card would only cover it.
     if (window.__trDogStop) window.__trDogStop();
+    rateDone();
     stat.textContent = "";
     diag.hidden = false;
     diag.innerHTML = "<b>" + title + "</b>\n\n" + detail + "\n\nbuild  " + BUILD;
@@ -1109,6 +1200,8 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
       window.__trSetPath = "";
       window.__trSetState = WORDS.setMissing + ": " + String((err && err.message) || err);
       setNote = "  -  " + WORDS.setMissing;
+      // The set's bytes will not come: the wait is the rest, and it is done.
+      rateDone();
       stat.textContent = WORDS.setMissing;
     });
     var realStart = engine.start;
@@ -1124,6 +1217,7 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
         if (cur > 0 && total > 0 && cur >= total) stat.textContent = "valley  " + mb(total) + " here, starting" + setNote;
       }
     }).then(function () {
+      rateDone();
       if (window.__trTick) window.__trTick("start");
       setBar(1);
       document.getElementById("boot").hidden = true;

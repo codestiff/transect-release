@@ -887,10 +887,10 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-3396e1f40d14.pck";
-  var PCK_BYTES = 12238176;
+  var PCK = "transect-967df18053b1.pck";
+  var PCK_BYTES = 12242656;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-3396e1f40d14.0.pck", "transect-3396e1f40d14.1.pck"];
+  var PCK_PARTS = ["transect-967df18053b1.0.pck", "transect-967df18053b1.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -920,6 +920,8 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
         e.part = part;
         throw e;
       }
+      // The set's bytes are counted too, under its own words (docs/plans/177).
+      if (!onBytes && part === SET_PCK && window.__trSetBytes) onBytes = window.__trSetBytes;
       return onBytes ? readAll(r, onBytes) : readAll(r);
     });
   }
@@ -954,12 +956,12 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.7 4f7542aac2  |  lib de0740c";
+  var BUILD = "transect 0.1.7 c1ed25f83f  |  lib de0740c";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "delivery/rc-unversioned 2926184+";
+  window.__trCommit = "delivery/rc-unversioned 59a7c49";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
@@ -967,14 +969,17 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
   document.getElementById("stamp").textContent = BUILD + "  |  " + window.__trCommit + (MT ? "  |  threads" : "");
 
   function setBar(f) { bar.style.width = (Math.max(0, Math.min(1, f)) * 100).toFixed(1) + "%"; }
-  // THE BAR IS BYTES (docs/plans/177): the engine's and the valley's, counted
-  // as they stream, over both together.
-  var got = { wasm: 0, pck: 0 };
-  function moved(which, label, of) {
+  // THE BAR IS BYTES, THE LINE ITS CONSTRAINT (docs/plans/177, the owner:
+  // "why is it taking so long? because we need to download one gigabyte and
+  // we're at this much"): the engine's, the valley's and its set's bytes,
+  // counted as they stream, and the line says which download binds now.
+  var got = { wasm: 0, pck: 0, set: 0 };
+  window.__trSetBytes = moved("set", "downloading the valley's set", SET_BYTES);
+  function moved(which, words, of) {
     return function (n) {
       got[which] += n;
-      setBar((got.wasm + got.pck) / Math.max(1, WASM_BYTES + PCK_BYTES));
-      stat.textContent = label + "  " + mb(got[which]) + " of " + mb(of);
+      setBar((got.wasm + got.pck + got.set) / Math.max(1, WASM_BYTES + PCK_BYTES + (SET_PCK ? SET_BYTES : 0)));
+      stat.textContent = words + ", " + Math.round(got[which] / 1048576) + " of " + Math.round(of / 1048576) + " MB";
     };
   }
   function mb(b) { return (b / 1048576).toFixed(1) + " MB"; }
@@ -1008,7 +1013,7 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
           return buf;
         }
         var part = PARTS[i++];
-        return getPart(part, moved("wasm", "engine", WASM_BYTES)).then(function (ab) {
+        return getPart(part, moved("wasm", "downloading the engine", WASM_BYTES)).then(function (ab) {
           buf.set(new Uint8Array(ab), at);
           at += ab.byteLength;
           return next();
@@ -1023,7 +1028,7 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
   var pckPromise = null;
   function getPck() {
     if (pckPromise) return pckPromise;
-    var onPck = moved("pck", "valley", PCK_BYTES);
+    var onPck = moved("pck", "downloading the valley", PCK_BYTES);
     pckPromise = Promise.all(PCK_PARTS.map(function (p) { return getPart(p, onPck); })).then(function (abs) {
       var buf = new Uint8Array(PCK_BYTES), at = 0;
       abs.forEach(function (ab) { buf.set(new Uint8Array(ab), at); at += ab.byteLength; });
@@ -1092,7 +1097,7 @@ if (typeof module !== "undefined") module.exports = TrWatchdog;
     // valley that fails is the start's failure, said by the start; the set is
     // then not fetched at all.
     function fetchSet() {
-      stat.textContent = "set  fetching " + mb(SET_BYTES);
+      stat.textContent = "downloading the valley's set, 0 of " + Math.round(SET_BYTES / 1048576) + " MB";
       return getPart(SET_PCK);
     }
     var setReady = !SET_PCK ? Promise.resolve() : getPck().then(fetchSet, function () { return null; }).then(function (ab) {

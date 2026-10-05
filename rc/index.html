@@ -254,7 +254,7 @@ var MODE = "public";
 // it to the collector (the build's TRANSECT_COLLECTOR_URL) once, when the walk
 // ends or the page goes away mid-walk. No address, nothing is sent: the
 // record stays on the device.
-window.__trCollector = "";
+window.__trCollector = "https://sessions.optilyr.com/v1/sessions";
 (function () {
   var pending = null, sent = false;
   // What left, for the diagnostics copy (dispatch row 83): a player can see
@@ -610,7 +610,7 @@ if (navigator.getBattery) {
   // over the spinner and the bar now, with what is known, Reload and Copy
   // report on it. Its state is page/watchdog.js; its rules and words,
   // src/delivery/watchdog.json.
-  var DOG_RULES = {"_what": "THE PAGE'S WATCHDOG (docs/plans/181; dispatch row 103, 'A crash is never a spinner'): what replaces the spinner and the bar with the crash card, and the card's words. page/watchdog.js reads these (tools/pack-web.py puts them in the page); test/suite_delivery.gd plays its states against them. A stall is the heartbeat silent for `stall_s` on a visible page: the download's progress while loading, the game's frame tick (src/delivery/walk_post.gd, TrHeartbeat) while playing. A page that was itself frozen (the watchdog's own check late by `frozen_s`) is not a stall: the clock starts again. THE DEVICE'S CARD (docs/plans/211; dispatch row 129): `need_mb` is what the walk needs of the device (the web bench's working heap, 322 MB, test/ledger/perf_ledger/web-review.json, with room); page/memprobe.js grows a probe toward it in `probe_step_mb` steps before the engine is fetched, and `words.device` says what it needs and what the device gave.", "stall_s": 30, "check_s": 2, "frozen_s": 6, "tick_s": 1, "oom": "out of memory|cannot enlarge memory|array buffer allocation failed|\\boom\\b", "words": {"oom": "The game stopped. This device may be out of memory.", "abort": "The game stopped unexpectedly.", "frame-stall": "The game stopped. This device may be out of memory.", "load-stall": "The download stalled; check the connection.", "device": "This device could not give the game the memory it needs. The walk needs about {need} MB; {gave}. Our apologies. It plays in a desktop browser or on a recent phone. Copy the report and send it to us.", "device_gave": "this device gave {gave} MB", "device_silent": "this device would not say how much it can give"}, "reload": "Reload", "copy": "Copy report", "need_mb": 384, "probe_step_mb": 64};
+  var DOG_RULES = {"_what": "THE PAGE'S WATCHDOG (docs/plans/181; dispatch row 103, 'A crash is never a spinner'): what replaces the spinner and the bar with the crash card, and the card's words. page/watchdog.js reads these (tools/pack-web.py puts them in the page); test/suite_delivery.gd plays its states against them. A stall is the heartbeat silent for `stall_s` on a visible page: the download's progress while loading, the game's frame tick (src/delivery/walk_post.gd, TrHeartbeat) while playing. A page that was itself frozen (the watchdog's own check late by `frozen_s`) is not a stall: the clock starts again. THE DEVICE'S CARD (docs/plans/211; dispatch row 129): `need_mb` is what the walk needs of the device: the engine's static peak up the trail is 331 MB at every quality level (tools/bench.sh, docs/plans/211's table), with room; the quality ladder trades drawing, not memory, so there is one need until a profile holds less; page/memprobe.js grows a probe toward it in `probe_step_mb` steps before the engine is fetched, and `words.device` says what it needs and what the device gave.", "stall_s": 30, "check_s": 2, "frozen_s": 6, "tick_s": 1, "oom": "out of memory|cannot enlarge memory|array buffer allocation failed|\\boom\\b", "words": {"oom": "The game stopped. This device may be out of memory.", "abort": "The game stopped unexpectedly.", "frame-stall": "The game stopped. This device may be out of memory.", "load-stall": "The download stalled; check the connection.", "device": "This device could not give the game the memory it needs. The walk needs about {need} MB; {gave}. Our apologies. It plays in a desktop browser or on a recent phone. Copy the report and send it to us.", "device_gave": "this device gave {gave} MB", "device_silent": "this device would not say how much it can give"}, "reload": "Reload", "copy": "Copy report", "need_mb": 384, "probe_step_mb": 64};
   // THE PAGE'S WATCHDOG (docs/plans/181; dispatch row 103, "A crash is never a
 // spinner"): a crash, an abort or a heartbeat gone silent replaces the spinner
 // and the bar with the crash card, at once, not on the next load. This is the
@@ -1014,10 +1014,10 @@ if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryPro
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-abe07231373d.pck";
-  var PCK_BYTES = 12335764;
+  var PCK = "transect-3131a064579f.pck";
+  var PCK_BYTES = 12352624;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-abe07231373d.0.pck", "transect-abe07231373d.1.pck"];
+  var PCK_PARTS = ["transect-3131a064579f.0.pck", "transect-3131a064579f.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -1083,12 +1083,12 @@ if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryPro
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.7 4af0743a2f  |  lib de0740c";
+  var BUILD = "transect 0.1.7 a70e252e41  |  lib de0740c";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "delivery/rc-unversioned 639f325+";
+  window.__trCommit = "delivery/rc-unversioned 103e1c9+";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");

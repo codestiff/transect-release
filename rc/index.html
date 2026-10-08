@@ -254,7 +254,7 @@ var MODE = "public";
 // it to the collector (the build's TRANSECT_COLLECTOR_URL) once, when the walk
 // ends or the page goes away mid-walk. No address, nothing is sent: the
 // record stays on the device.
-window.__trCollector = "";
+window.__trCollector = "https://sessions.optilyr.com/v1/sessions";
 (function () {
   var pending = null, sent = false;
   // What left, for the diagnostics copy (dispatch row 83): a player can see
@@ -1014,10 +1014,10 @@ if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryPro
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-17a7d9ae655a.pck";
-  var PCK_BYTES = 14280092;
+  var PCK = "transect-650726c0c80b.pck";
+  var PCK_BYTES = 14395456;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-17a7d9ae655a.0.pck", "transect-17a7d9ae655a.1.pck"];
+  var PCK_PARTS = ["transect-650726c0c80b.0.pck", "transect-650726c0c80b.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -1083,12 +1083,12 @@ if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryPro
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.7 fefa567379  |  lib 796e45a";
+  var BUILD = "transect 0.1.7 459019a657  |  lib 796e45a";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "feature/luka-fetch a2a17d0";
+  window.__trCommit = "delivery/rc-unversioned d07de4b+";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");

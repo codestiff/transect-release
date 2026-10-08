@@ -1014,10 +1014,10 @@ if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryPro
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-21957af0a5d1.pck";
-  var PCK_BYTES = 12861824;
+  var PCK = "transect-a53dfd44921c.pck";
+  var PCK_BYTES = 12861840;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-21957af0a5d1.0.pck", "transect-21957af0a5d1.1.pck"];
+  var PCK_PARTS = ["transect-a53dfd44921c.0.pck", "transect-a53dfd44921c.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -1083,12 +1083,12 @@ if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryPro
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.7 7248c96fd3  |  lib 796e45a";
+  var BUILD = "transect 0.1.7 5d07ed136f  |  lib 796e45a";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "feature/luka-fetch a34c198";
+  window.__trCommit = "feature/luka-fetch 771f7d1";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");

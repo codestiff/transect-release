@@ -124,9 +124,28 @@
     background: var(--fern); color: var(--ground);
   }
   #crash button.quiet { background: var(--line); color: var(--ink); }
+  /* THE SPLASH (docs/plans/226): the map under the words, the download its
+     line (page/splash.js). Transect's map is the dark valley's; Norge's page is
+     a sea chart on cream paper. */
+  :root { --map: #2c3a31; --map2: #3a4b3f; --trail: #86b98f; --note: #d6a25f; }
+  body.norge {
+    color-scheme: light;
+    --ground: #efe6d2; --surface: #e4d9c0; --line: #c9bc9e; --ink: #1f2328; --muted: #5b5a52;
+    --fern: #a8322a; --red: #a8322a;
+    --map: #c9bc9e; --map2: #a99a78; --trail: #a8322a; --note: #2f5d7c;
+  }
+  body.norge #stamp { color: #1f232899; }
+  #splash { position: absolute; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; }
+  #boot > :not(#splash) { position: relative; z-index: 1; }
+  #boot.mapped { justify-content: flex-start; padding-top: calc(max(24px, 9vh) + env(safe-area-inset-top, 0px)); }
+  #boot.mapped .rule { display: none; }
   @media (prefers-reduced-motion: reduce) { .rule i { transition: none; } }
   /* A build for players: the developer's lines hidden (docs/plans/025). */
   .public .dev { display: none; }
+  /* The page's stamp over everything is the developer's (docs/plans/226): a
+     player's build keeps its text for the reports, unseen; the start card
+     shows the build in the game (docs/plans/119). */
+  .public #stamp { display: none; }
 </style>
 
 <canvas id="canvas" tabindex="0" aria-label="The valley"></canvas>
@@ -136,6 +155,7 @@
      arrives, and in the game the way in's buttons fill as the valley grows. -->
 
 <div id="boot">
+  <canvas id="splash" aria-hidden="true"></canvas>
   <h1>transect</h1>
   <p class="gloss">Into the wilderness: a night out in a Highland valley, grown on your device as you arrive.</p>
   <div class="rule" aria-hidden="true"><i id="bar"></i></div>
@@ -149,6 +169,258 @@
   </dl>
   <div id="diag" hidden></div>
 </div>
+
+<script>
+// THE SPLASH (docs/plans/226), from the first paint: the product's words, and
+// the map whose line is the download (page/splash.js). A page that cannot draw
+// it keeps the plain bar.
+// THE PAGE'S SPLASH (docs/plans/226; the owner 2026-10-09: "production value
+// ... for both transect and for Norge ... something with JavaScript ... a fun
+// concept", then "let's include taps and notes"). The download drawn as the
+// product's own act: Transect walks a survey line across a contour map with a
+// field note at each tenth, naming what grows in the valley; Norge plots a
+// course on a sea chart with its marks and soundings. A tap places a cairn
+// (Transect) or drops a buoy (Norge). The map is drawn once; a frame redraws
+// only the line, and the frames stop when the download is in, so the splash
+// never competes with the engine's compile for the main thread.
+//
+// The pure half (no page) is what the suite plays under node
+// (test/suite_delivery.gd); page/shell.html makes a TrSplash on its canvas and
+// tools/pack-web.py puts this file and the product's words in the page.
+//
+//   trSplashRng(seed)               a repeatable random in [0, 1)
+//   trSplashField(seed)             the map's height, h(x, y) in [0, 1]
+//   trSplashPath(seed, w, top, bot) the line's points across the band
+//   trSplashNotes(cfg, seed)        the TICKS notes, in the order they appear
+//   trSplashMark(marks, x, y, t)    the marks after a tap: at most MARKS
+//   TrSplash(canvas, cfg)           the drawing: .progress(f), .tap(x, y), .stop()
+var TR_SPLASH = { TICKS: 10, MARKS: 12, POINTS: 240, NOTE_FADE_MS: 500 };
+
+function trSplashRng(seed) {
+  var s = (Math.abs(Math.floor(seed)) % 2147483646) + 1;
+  return function () { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+}
+
+function trSplashField(seed) {
+  var r = trSplashRng(seed), g = [];
+  for (var i = 0; i < 64 * 64; i++) g.push(r());
+  function at(a, b) { return g[((b & 63) * 64) + (a & 63)]; }
+  function vn(px, py) {
+    var xi = Math.floor(px), yi = Math.floor(py), fx = px - xi, fy = py - yi;
+    var sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    return (at(xi, yi) * (1 - sx) + at(xi + 1, yi) * sx) * (1 - sy) +
+      (at(xi, yi + 1) * (1 - sx) + at(xi + 1, yi + 1) * sx) * sy;
+  }
+  // Three octaves, in CSS pixels: hills a few hundred pixels across.
+  return function (px, py) {
+    var k = 0.004;
+    return vn(px * k, py * k) * 0.6 + vn(px * k * 2.3, py * k * 2.3) * 0.3 + vn(px * k * 5, py * k * 5) * 0.1;
+  };
+}
+
+// A wandering line from 8% to 92% of the width, between `top` and `bot`: three
+// waves of random phase, so it rises and falls and never runs flat on an edge.
+function trSplashPath(seed, w, top, bot) {
+  var r = trSplashRng(seed * 31 + 5), pts = [], mid = (top + bot) / 2, amp = (bot - top) / 2;
+  var p1 = r() * 6.283, p2 = r() * 6.283, p3 = r() * 6.283;
+  for (var i = 0; i <= TR_SPLASH.POINTS; i++) {
+    var t = i / TR_SPLASH.POINTS;
+    var y = mid + amp * (0.6 * Math.sin(6.283 * t * 1.3 + p1) + 0.3 * Math.sin(6.283 * t * 3.1 + p2) + 0.1 * Math.sin(6.283 * t * 7 + p3));
+    pts.push([w * (0.08 + 0.84 * t), Math.max(top, Math.min(bot, y))]);
+  }
+  return pts;
+}
+
+// The notes at the ticks. An ordered list (Norge's course, out from the
+// hamlet) is kept in its order; else the list is shuffled by `seed` (a new
+// day, new notes) and repeated when it is short.
+function trSplashNotes(cfg, seed) {
+  var list = (cfg.notes || []).slice(), out = [];
+  if (!list.length) return out;
+  if (!cfg.ordered) {
+    var r = trSplashRng(seed);
+    for (var i = list.length - 1; i > 0; i--) { var j = Math.floor(r() * (i + 1)), t = list[i]; list[i] = list[j]; list[j] = t; }
+  }
+  for (var k = 0; k < TR_SPLASH.TICKS; k++) out.push(list[k % list.length]);
+  return out;
+}
+
+// A tap's mark, kept with the others; the oldest goes past MARKS.
+function trSplashMark(marks, x, y, t) {
+  var out = marks.concat([{ x: x, y: y, t: t }]);
+  return out.length > TR_SPLASH.MARKS ? out.slice(out.length - TR_SPLASH.MARKS) : out;
+}
+
+function TrSplash(canvas, cfg) {
+  var x = canvas.getContext("2d"), map = document.createElement("canvas");
+  var reduced = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var norge = cfg.product === "norge";
+  var seed = norge ? 11 : 7, day = Math.floor(Date.now() / 86400000);
+  var notes = trSplashNotes(cfg, day), seen = [], marks = [];
+  var W, H, DPR, path, f = 0, raf = 0, stopped = false, busyUntil = 0;
+  function css(n) { return getComputedStyle(document.body).getPropertyValue(n).trim(); }
+  function rgba(hex, a) {
+    var v = parseInt(hex.replace("#", ""), 16);
+    return "rgba(" + (v >> 16 & 255) + "," + (v >> 8 & 255) + "," + (v & 255) + "," + a + ")";
+  }
+
+  function drawMap() {
+    map.width = W; map.height = H;
+    var m = map.getContext("2d"), h = trSplashField(seed), paper = css("--ground");
+    m.fillStyle = paper; m.fillRect(0, 0, W, H);
+    // Contours by marching squares on a coarse grid, one stroke per level.
+    var step = 6, cols = Math.ceil(W / DPR / step) + 1, rows = Math.ceil(H / DPR / step) + 1, v = [], i, j;
+    for (j = 0; j < rows; j++) for (i = 0; i < cols; i++) v.push(h(i * step, j * step));
+    var levels = norge ? 7 : 12, S = step * DPR;
+    if (norge) {
+      // The land washed: a coarse mask, blurred, so the shore reads as land.
+      var wash = document.createElement("canvas"); wash.width = cols; wash.height = rows;
+      var wm = wash.getContext("2d"), im = wm.createImageData(cols, rows);
+      for (j = 0; j < rows * cols; j++) { im.data[j * 4] = 196; im.data[j * 4 + 1] = 170; im.data[j * 4 + 2] = 112; im.data[j * 4 + 3] = v[j] > 0.55 ? 34 : 0; }
+      wm.putImageData(im, 0, 0); m.save(); m.filter = "blur(" + 3 * DPR + "px)";
+      m.drawImage(wash, 0, 0, cols * S, rows * S); m.restore();
+    }
+    for (var L = 1; L < levels; L++) {
+      var lv = 0.25 + L * 0.5 / levels;
+      m.strokeStyle = css(L % 4 === 0 ? "--map2" : "--map"); m.lineWidth = (L % 4 === 0 ? 1.4 : 0.8) * DPR;
+      m.beginPath();
+      for (j = 0; j < rows - 1; j++) for (i = 0; i < cols - 1; i++) {
+        var a = v[j * cols + i], b = v[j * cols + i + 1], c = v[(j + 1) * cols + i + 1], d = v[(j + 1) * cols + i], p = [];
+        if ((a < lv) !== (b < lv)) p.push([(i + (lv - a) / (b - a)) * S, j * S]);
+        if ((b < lv) !== (c < lv)) p.push([(i + 1) * S, (j + (lv - b) / (c - b)) * S]);
+        if ((d < lv) !== (c < lv)) p.push([(i + (lv - d) / (c - d)) * S, (j + 1) * S]);
+        if ((a < lv) !== (d < lv)) p.push([i * S, (j + (lv - a) / (d - a)) * S]);
+        if (p.length >= 2) { m.moveTo(p[0][0], p[0][1]); m.lineTo(p[1][0], p[1][1]); }
+        if (p.length === 4) { m.moveTo(p[2][0], p[2][1]); m.lineTo(p[3][0], p[3][1]); }
+      }
+      m.stroke();
+    }
+    // The title's corner kept quiet: the map fades under the words.
+    var gr = m.createRadialGradient(W * 0.12, H * 0.16, 0, W * 0.12, H * 0.16, Math.max(W, H) * 0.6);
+    gr.addColorStop(0, rgba(paper, 0.9)); gr.addColorStop(0.45, rgba(paper, 0.85)); gr.addColorStop(1, rgba(paper, 0));
+    m.fillStyle = gr; m.fillRect(0, 0, W, H);
+    if (norge) {
+      var rx = W - 70 * DPR, ry = H - 90 * DPR, rr = 30 * DPR;
+      m.strokeStyle = css("--map2"); m.lineWidth = DPR;
+      m.beginPath(); m.arc(rx, ry, rr, 0, 7); m.stroke();
+      for (var k = 0; k < 16; k++) {
+        var an = k * Math.PI / 8, len = k % 4 ? rr * 0.55 : rr * 1.15;
+        m.beginPath(); m.moveTo(rx, ry); m.lineTo(rx + Math.sin(an) * len, ry - Math.cos(an) * len); m.stroke();
+      }
+      m.fillStyle = css("--ink"); m.font = 12 * DPR + "px Spectral, Georgia, serif"; m.textAlign = "center";
+      m.fillText("N", rx, ry - rr * 1.35);
+    }
+  }
+
+  function layout() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = Math.round(innerWidth * DPR); H = Math.round(innerHeight * DPR);
+    canvas.width = W; canvas.height = H;
+    // The band under the words: below what the page says, at most 30% tall.
+    var under = cfg.under ? cfg.under() : innerHeight * 0.55;
+    var top = Math.max(innerHeight * 0.5, Math.min(innerHeight * 0.8, under + 36));
+    var bot = Math.min(innerHeight - 48, top + innerHeight * 0.3);
+    path = trSplashPath(seed, W, top * DPR, Math.max(top, bot) * DPR);
+    drawMap();
+  }
+
+  function cairn(m) {
+    x.fillStyle = css("--note");
+    [[0, 0, 6], [0, -6, 4.5], [0.5, -10.5, 3]].forEach(function (s) {
+      x.beginPath(); x.ellipse(m.x * DPR + s[0] * DPR, m.y * DPR + s[1] * DPR, s[2] * DPR, s[2] * 0.62 * DPR, 0, 0, 7); x.fill();
+    });
+  }
+  function buoy(m, now) {
+    var age = reduced ? 1 : Math.min(1, (now - m.t) / 900);
+    x.strokeStyle = css("--note"); x.lineWidth = DPR; x.globalAlpha = 1 - age;
+    x.beginPath(); x.arc(m.x * DPR, m.y * DPR, (6 + 18 * age) * DPR, 0, 7); x.stroke(); x.globalAlpha = 1;
+    x.fillStyle = css("--trail"); x.beginPath(); x.arc(m.x * DPR, m.y * DPR, 4.5 * DPR, 0, 7); x.fill();
+    x.fillStyle = css("--ground"); x.fillRect(m.x * DPR - 4.5 * DPR, m.y * DPR - 1 * DPR, 9 * DPR, 2 * DPR);
+  }
+
+  function draw(now) {
+    x.drawImage(map, 0, 0);
+    var n = Math.floor(Math.max(0, Math.min(1, f)) * (path.length - 1)), i;
+    x.lineCap = "round"; x.lineJoin = "round";
+    // The way still to go, dashed and faint; the way come, drawn.
+    x.setLineDash([3 * DPR, 6 * DPR]); x.strokeStyle = css("--map2"); x.lineWidth = 1.2 * DPR;
+    x.beginPath(); x.moveTo(path[n][0], path[n][1]);
+    for (i = n; i < path.length; i++) x.lineTo(path[i][0], path[i][1]);
+    x.stroke();
+    x.setLineDash(norge ? [10 * DPR, 5 * DPR] : []); x.strokeStyle = css("--trail"); x.lineWidth = 2.4 * DPR;
+    x.beginPath(); x.moveTo(path[0][0], path[0][1]);
+    for (i = 1; i <= n; i++) x.lineTo(path[i][0], path[i][1]);
+    x.stroke(); x.setLineDash([]);
+    x.font = 12 * DPR + "px Spectral, Georgia, serif"; x.textAlign = "center";
+    for (var k = 1; k <= TR_SPLASH.TICKS; k++) {
+      var q = path[Math.round(k / TR_SPLASH.TICKS * (path.length - 1))], reached = f >= k / TR_SPLASH.TICKS, up = k % 2 ? -1 : 1;
+      x.strokeStyle = css(reached ? "--trail" : "--map2"); x.lineWidth = 1.2 * DPR;
+      x.beginPath(); x.moveTo(q[0], q[1] - 6 * DPR); x.lineTo(q[0], q[1] + 6 * DPR); x.stroke();
+      // A narrow screen has room for every other note, above and below in turn.
+      var narrow = W / DPR < 640, shown = !narrow || k % 2 === 0;
+      if (narrow) up = k % 4 ? -1 : 1;
+      if (reached && notes[k - 1] && shown) {
+        if (!seen[k]) seen[k] = now;
+        var age = reduced ? 1 : Math.min(1, (now - seen[k]) / TR_SPLASH.NOTE_FADE_MS);
+        if (age < 1) busyUntil = Math.max(busyUntil, seen[k] + TR_SPLASH.NOTE_FADE_MS);
+        x.globalAlpha = age; x.fillStyle = css("--note");
+        // Clear of the line under the words, not just of the tick.
+        var half = x.measureText(notes[k - 1]).width / 2 + 4 * DPR, lo = q[1], hi = q[1];
+        for (var pi = 0; pi < path.length; pi++) if (Math.abs(path[pi][0] - q[0]) < half) { lo = Math.min(lo, path[pi][1]); hi = Math.max(hi, path[pi][1]); }
+        var drift = 6 * (1 - age) * DPR;
+        x.fillText(notes[k - 1], q[0], up < 0 ? lo - 12 * DPR - drift : hi + 20 * DPR + drift);
+        x.globalAlpha = 1;
+      }
+    }
+    marks.forEach(function (m) { if (cfg.tap === "buoy") buoy(m, now); else cairn(m); });
+    var hd = path[n], pulse = (reduced || f >= 1) ? 0 : Math.sin(now / 300) * 1.5;
+    x.fillStyle = css("--trail"); x.beginPath(); x.arc(hd[0], hd[1], (5 + pulse) * DPR, 0, 7); x.fill();
+  }
+
+  // Frames run while the download moves, a fading note settles or a buoy's
+  // ring spreads; then the splash is still until something changes.
+  var drawn = -1e9;
+  function frame(now) {
+    raf = 0;
+    // Hidden (the device's card, a crash): no frames until shown and moved.
+    if (stopped || !canvas.getClientRects().length) return;
+    // At most 30 frames a second: the line moves slowly; the thread is shared.
+    if (now - drawn >= 32) { draw(now); drawn = now; }
+    var settling = now < busyUntil || (cfg.tap === "buoy" && marks.some(function (m) { return now - m.t < 900; }));
+    if ((f < 1 && !reduced) || settling) raf = requestAnimationFrame(frame);
+  }
+  function kick() { if (!raf && !stopped) raf = requestAnimationFrame(frame); }
+
+  layout();
+  addEventListener("resize", function () { if (!stopped) { layout(); kick(); } });
+  kick();
+  return {
+    progress: function (v) { f = Math.max(f, Math.min(1, v)); kick(); },
+    tap: function (px, py) { marks = trSplashMark(marks, px, py, performance.now()); kick(); },
+    stop: function () { stopped = true; if (raf) cancelAnimationFrame(raf); raf = 0; },
+    notes: notes
+  };
+}
+if (typeof module !== "undefined") module.exports = { TR_SPLASH: TR_SPLASH, trSplashRng: trSplashRng, trSplashField: trSplashField,
+  trSplashPath: trSplashPath, trSplashNotes: trSplashNotes, trSplashMark: trSplashMark };
+
+(function () {
+  var cfg = {"title": "Transect", "gloss": "Into the wilderness: a night out in a Highland valley, grown on your device as you arrive.", "tap": "cairn", "product": "transect", "notes": ["Rowan", "Downy birch", "Pine", "Bramble", "Meadow buttercup", "Dock", "Rosebay willowherb", "Yellow rattle", "Fern", "Moss", "Mountain hare", "Fallen trunk", "Fallen birch", "Erratic", "Fishing station"], "ordered": false};
+  var boot = document.getElementById("boot"), cv = document.getElementById("splash");
+  document.body.classList.add(cfg.product);
+  boot.querySelector("h1").textContent = cfg.title;
+  boot.querySelector(".gloss").textContent = cfg.gloss;
+  var how = boot.querySelector(".how");
+  cfg.under = function () { return how.getBoundingClientRect().bottom; };
+  try {
+    if (!cv.getContext("2d")) return;
+    boot.classList.add("mapped");
+    window.__trSplash = TrSplash(cv, cfg);
+  } catch (e) { boot.classList.remove("mapped"); return; }
+  // A tap on the map leaves a cairn, or drops a buoy.
+  cv.addEventListener("pointerdown", function (e) { window.__trSplash.tap(e.clientX, e.clientY); });
+})();
+</script>
 
 <div id="crash" role="alert" hidden>
   <p id="crash-text">The last walk stopped unexpectedly.</p>
@@ -1014,10 +1286,10 @@ if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryPro
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-13abb4b1ec50.pck";
-  var PCK_BYTES = 14395504;
+  var PCK = "transect-5ed7db2640a6.pck";
+  var PCK_BYTES = 14420204;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-13abb4b1ec50.0.pck", "transect-13abb4b1ec50.1.pck"];
+  var PCK_PARTS = ["transect-5ed7db2640a6.0.pck", "transect-5ed7db2640a6.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -1083,19 +1355,22 @@ if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryPro
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.7 c1d447a1f8  |  lib 796e45a";
+  var BUILD = "transect 0.1.7 9c5a04edad  |  lib 796e45a";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "walk/bark-merge ff09109+";
+  window.__trCommit = "general/rc 4f983b1";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
   var diag = document.getElementById("diag");
   document.getElementById("stamp").textContent = BUILD + "  |  " + window.__trCommit + (MT ? "  |  threads" : "");
 
-  function setBar(f) { bar.style.width = (Math.max(0, Math.min(1, f)) * 100).toFixed(1) + "%"; }
+  function setBar(f) {
+    bar.style.width = (Math.max(0, Math.min(1, f)) * 100).toFixed(1) + "%";
+    if (window.__trSplash) window.__trSplash.progress(f);
+  }
   // THE BAR IS BYTES, THE LINE ITS CONSTRAINT (docs/plans/177, the owner:
   // "why is it taking so long? because we need to download one gigabyte and
   // we're at this much"): the engine's, the valley's and its set's bytes,
@@ -1363,6 +1638,7 @@ if (typeof module !== "undefined") module.exports = trEngineArgs;
       rateDone();
       if (window.__trTick) window.__trTick("start");
       setBar(1);
+      if (window.__trSplash) window.__trSplash.stop();
       document.getElementById("boot").hidden = true;
       document.getElementById("canvas").focus();
     }, function (err) {

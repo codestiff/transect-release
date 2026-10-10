@@ -405,7 +405,7 @@ if (typeof module !== "undefined") module.exports = { TR_SPLASH: TR_SPLASH, trSp
   trSplashPath: trSplashPath, trSplashNotes: trSplashNotes, trSplashMark: trSplashMark };
 
 (function () {
-  var cfg = {"title": "Transect", "gloss": "Into the wilderness: a night out in a Highland valley, grown on your device as you arrive.", "tap": "cairn", "product": "transect", "notes": ["Rowan", "Downy birch", "Pine", "Bramble", "Meadow buttercup", "Dock", "Rosebay willowherb", "Yellow rattle", "Fern", "Moss", "Mountain hare", "Fallen trunk", "Fallen birch", "Erratic", "Fishing station"], "ordered": false};
+  var cfg = {"title": "Transect", "gloss": "Into the wilderness: a night out in a Highland valley, grown on your device as you arrive.", "tap": "cairn", "product": "transect", "notes": ["Rowan", "Downy birch", "Pine", "Bramble", "Meadow buttercup", "Dock", "Rosebay willowherb", "Yellow rattle", "Fern", "Moss", "Mountain hare", "Fallen trunk", "Fallen birch", "Erratic", "Fishing station", "Village house"], "ordered": false};
   var boot = document.getElementById("boot"), cv = document.getElementById("splash");
   document.body.classList.add(cfg.product);
   boot.querySelector("h1").textContent = cfg.title;
@@ -1271,7 +1271,28 @@ function trDeviceWords(rules, needMb, gaveMb) {
   var gave = (gaveMb == null) ? rules.words.device_silent : rules.words.device_gave.replace("{gave}", Math.round(gaveMb));
   return rules.words.device.replace("{need}", Math.round(needMb)).replace("{gave}", gave);
 }
-if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryProbe, trDeviceWords: trDeviceWords };
+// THE DEVICE'S CLASS FOR THE START FLOW (docs/plans/226 step 4; row 184): the
+// budget the game's screens are chosen under (src/delivery/start_flow.json's
+// `budgets`), from what the page knows before the engine is fetched -- the
+// probe's runtime and the view (`view`: {wide, fine}, a canvas of 900 px or
+// more and a fine pointer). A desktop is wide with a mouse; a phone that got
+// the threaded runtime is a phone; one left a single thread is the low phone.
+// The governor's first menu frames may step it down (step 3, the
+// performance seat's).
+function trDeviceClass(probe, view) {
+  if (view && view.wide && view.fine) return "desktop";
+  return (probe && probe.runtime === "threaded") ? "phone" : "phone_low";
+}
+// The class added to the engine's arguments: on every page, a player's too
+// (it names a budget, never a scene), after the "--" that starts the game's own.
+function trDeviceArgs(args, cls) {
+  var out = (args || []).slice();
+  if (out.indexOf("--") < 0) out.unshift("--");
+  out.push("--device-class=" + cls);
+  return out;
+}
+if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryProbe, trDeviceWords: trDeviceWords,
+  trDeviceClass: trDeviceClass, trDeviceArgs: trDeviceArgs };
 
   var MEM_RULES = window.__trDogRules;
   var singleAfterOom = false;
@@ -1286,10 +1307,10 @@ if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryPro
   var PARTS = MT ? PARTS_MT : ["godot.0.wasm", "godot.1.wasm", "godot.2.wasm", "godot.3.wasm", "godot.4.wasm"];
   var WASM_BYTES = MT ? 37342091 : 38057390;
   window.__trRuntime = MT ? "threaded" : "single-threaded";
-  var PCK = "transect-a34dad68e919.pck";
-  var PCK_BYTES = 14430852;
+  var PCK = "transect-fb6ef1a8591e.pck";
+  var PCK_BYTES = 14855940;
   // The valley's pack, in parts when it is over a chunk (tools/pack-web.py).
-  var PCK_PARTS = ["transect-a34dad68e919.0.pck", "transect-a34dad68e919.1.pck"];
+  var PCK_PARTS = ["transect-fb6ef1a8591e.0.pck", "transect-fb6ef1a8591e.1.pck"];
   // THE BAKED REVIEW SET'S PACK (docs/plans/108 step 4), when the build has
   // one: preloaded into the engine's files, and mounted by the game
   // (src/delivery/packs.gd) before the valley asks for a rung.
@@ -1355,12 +1376,12 @@ if (typeof module !== "undefined") module.exports = { trMemoryProbe: trMemoryPro
     return msg;
   }
   window.__trFetchWords = fetchWords;
-  var BUILD = "transect 0.1.7 621f640e19  |  lib 796e45a";
+  var BUILD = "transect 0.1.7 604d492c1d  |  lib 4e6abf6";
   // The game keys the plants it keeps on the device by this (TrRungStore).
   window.__trBuild = BUILD;
   // THE COMMIT BUILT (tools/pack-web.py, docs/plans/111): apart from BUILD,
   // so a build of the same code keeps the plants the device already has.
-  window.__trCommit = "delivery/rc 0a432bb+";
+  window.__trCommit = "seam/bump-row201 40ef92f";
 
   var bar = document.getElementById("bar");
   var stat = document.getElementById("stat");
@@ -1577,6 +1598,13 @@ if (typeof module !== "undefined") module.exports = trEngineArgs;
 
     var args = [];
     try { args = trEngineArgs(DEV, location.search); } catch (e) { args = []; }
+    // THE DEVICE'S CLASS (docs/plans/226 step 4): the budget the game's start
+    // screens are chosen under, from the probe and the view.
+    try {
+      window.__trDeviceClass = trDeviceClass(PROBE, { wide: innerWidth >= 900,
+        fine: !!(window.matchMedia && matchMedia("(pointer: fine)").matches) });
+      args = trDeviceArgs(args, window.__trDeviceClass);
+    } catch (e) { /* the game takes its own default */ }
     var engine = new Engine({
       args: args,
       canvas: document.getElementById("canvas"),
